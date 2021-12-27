@@ -6,8 +6,8 @@ pygame.init()
 pygame.key.set_repeat(200, 70)
 
 FPS = 60
-WIDTH = 500
-HEIGHT = 500
+WIDTH = 480
+HEIGHT = 480
 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
@@ -83,7 +83,7 @@ class Tile(pygame.sprite.Sprite):
 tile_images = {'grass': load_image('grass.png'), 'road_g': load_image('road_g.png'), 'road_v': load_image('road_v.png'),
                'road_1': load_image('road_1.png'), 'road_2': load_image('road_2.png'), 'road_3':
                    load_image('road_3.png'), 'road_4': load_image('road_4.png')}
-tile_width = tile_height = 50
+tile_width = tile_height = 48
 
 generate_level(load_level('level_1.txt'))
 running = True
