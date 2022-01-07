@@ -17,6 +17,7 @@ all_sprites = pygame.sprite.Group()
 tiles_group = pygame.sprite.Group()
 towers_group = pygame.sprite.Group()
 enemies_group = pygame.sprite.Group()
+projectiles_group = pygame.sprite.Group()
 
 
 def load_tiles(name, color_key=None):
@@ -112,8 +113,70 @@ class Board:
         return self.on_click(cell)
 
 
-class Tower(pygame.sprite.Sprite):
+class Enemy(pygame.sprite.Sprite):
     def __init__(self, sheet, columns, rows, x, y):
+        super().__init__(enemies_group, all_sprites)
+        self.frames = []
+        self.cut_sheet(sheet, columns, rows)
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        self.rect = self.rect.move(x, y)
+        self.turn = 1
+        self.win = False
+        self.x, self.y = x / 48, y / 48
+
+    def cut_sheet(self, sheet, columns, rows):
+        self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
+                                sheet.get_height() // rows)
+        for j in range(rows):
+            for i in range(columns):
+                frame_location = (self.rect.width * i, self.rect.height * j)
+                self.frames.append(sheet.subsurface(pygame.Rect(frame_location, self.rect.size)))
+
+    def update(self):
+        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
+        self.image = self.frames[self.cur_frame]
+        if (self.rect.x, self.rect.y) == level_1[5] and not self.win:
+            self.kill()
+            print('вы проиграли')
+            self.win = True
+        elif not self.win:
+            turn = level_1[self.turn - 1]
+            next_turn = level_1[self.turn]
+            if turn[0] < next_turn[0]:
+                self.rect = self.rect.move(5, 0)
+            elif turn[0] > next_turn[0]:
+                self.rect = self.rect.move(-5, 0)
+            elif turn[1] < next_turn[1]:
+                self.rect = self.rect.move(0, 5)
+            elif turn[1] > next_turn[1]:
+                self.rect = self.rect.move(0, -5)
+            if (self.rect.x, self.rect.y) == level_1[self.turn]:
+                self.turn += 1
+        else:
+            pass
+        # coords
+        self.x, self.y = self.rect.x // 48 + 1, self.rect.y // 48 + 1
+
+
+class Fire_Enemy(Enemy):
+    pass
+
+
+class Storm_Enemy(Enemy):
+    pass
+
+
+class Earth_Enemy(Enemy):
+    pass
+
+
+class Water_Enemy(Enemy):
+    pass
+
+
+class Projectile(pygame.sprite.Sprite):
+    def __init__(self, sheet, columns, rows, x, y, target):
         super().__init__(all_sprites)
         self.frames = []
         self.cut_sheet(sheet, columns, rows)
@@ -134,16 +197,17 @@ class Tower(pygame.sprite.Sprite):
         self.image = self.frames[self.cur_frame]
 
 
-class Enemy(pygame.sprite.Sprite):
+class Tower(pygame.sprite.Sprite):
     def __init__(self, sheet, columns, rows, x, y):
-        super().__init__(enemies_group, all_sprites)
+        super().__init__(all_sprites)
         self.frames = []
         self.cut_sheet(sheet, columns, rows)
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
         self.rect = self.rect.move(x, y)
-        self.turn = 1
-        self.win = False
+        self.enemy_in_range = False
+        self.x, self.y = x / 48, y / 48
+        self.enemies_list = list()
 
     def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
@@ -156,41 +220,28 @@ class Enemy(pygame.sprite.Sprite):
     def update(self):
         self.cur_frame = (self.cur_frame + 1) % len(self.frames)
         self.image = self.frames[self.cur_frame]
-        if (self.rect.x, self.rect.y) == level_1[5] and not self.win:
-            enemies_group.remove(fire_enemy)
-            print('вы проиграли')
-            self.win = True
-        elif not self.win:
-            turn = level_1[self.turn - 1]
-            next_turn = level_1[self.turn]
-            if turn[0] < next_turn[0]:
-                self.rect = self.rect.move(5, 0)
-            elif turn[0] > next_turn[0]:
-                self.rect = self.rect.move(-5, 0)
-            elif turn[1] < next_turn[1]:
-                self.rect = self.rect.move(0, 5)
-            elif turn[1] > next_turn[1]:
-                self.rect = self.rect.move(0, -5)
-            if (self.rect.x, self.rect.y) == level_1[self.turn]:
-                self.turn += 1
-        else:
-            pass
+        # coords
+        for enemy in enemies_group:
+            if (enemy.x + 1 == self.x and enemy.y + 1 == self.y) or (enemy.x == self.x and enemy.y + 1 == self.y) or \
+                    (enemy.x - 1 == self.x and enemy.y + 1 == self.y) or \
+                    (enemy.x - 1 == self.x and enemy.y == self.y) or \
+                    (enemy.x - 1 == self.x and enemy.y - 1 == self.y) or \
+                    (enemy.x == self.x and enemy.y - 1 == self.y) or \
+                    (enemy.x + 1 == self.x and enemy.y - 1 == self.y) or \
+                    (enemy.x + 1 == self.x and enemy.y == self.y):
+                if enemy not in self.enemies_list:
+                    self.enemies_list.append(enemy)
+                    self.attack()
+            else:
+                try:
+                    self.enemies_list.remove(enemy)
+                except BaseException:
+                    pass
 
-
-class Fire_Enemy(Enemy):
-    pass
-
-
-class Storm_Enemy(Enemy):
-    pass
-
-
-class Earth_Enemy(Enemy):
-    pass
-
-
-class Water_Enemy(Enemy):
-    pass
+    def attack(self):
+        bullet = Projectile(load_image('bullet.png'), 4, 1, self.x * 48, self.y * 48,
+                            self.enemies_list[len(self.enemies_list) - 1])
+        projectiles_group.add(bullet)
 
 
 tile_images = {'grass': load_tiles('grass.png'), 'road_g': load_tiles('road_g.png'), 'road_v': load_tiles('road_v.png'),
@@ -223,10 +274,21 @@ while running:
             elif event.button == 5:
                 water_enemy = Water_Enemy(load_image('water_enemy.png'), 4, 1, level_1[0][0], level_1[0][1])
                 enemies_group.add(water_enemy)
+            elif event.button == 2:
+                x, y = board.get_click(event.pos)
+                print(x, y)
+                if (x < 8 and y == 2) or (x == 7 and y == 3) or (x == 7 and y == 4) or \
+                        ((x < 6 or x == 7) and y == 5) or ((x == 5 or x == 7) and y == 6) or \
+                        ((4 < x < 8) and y == 7):
+                    pass
+                else:
+                    tower = Tower(load_image('fire_enemy.png'), 4, 1, x * 48, y * 48)
+                    towers_group.add(tower)
     screen.fill(pygame.Color(0, 0, 0))
     tiles_group.draw(screen)
     towers_group.draw(screen)
     enemies_group.draw(screen)
+    projectiles_group.draw(screen)
     pygame.display.flip()
     clock.tick(7)
     all_sprites.update()
