@@ -17,12 +17,13 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 
 clock = pygame.time.Clock()
 
-all_sprites = pygame.sprite.Group()
+
 tiles_group = pygame.sprite.Group()
 towers_group = pygame.sprite.Group()
 enemies_group = pygame.sprite.Group()
 projectiles_group = pygame.sprite.Group()
 menu_group = pygame.sprite.Group()
+rect_group = pygame.sprite.Group()
 
 
 def load_tiles(name, color_key=None):
@@ -142,6 +143,8 @@ class Enemy(pygame.sprite.Sprite):
         self.move_speed = 1
         self.reaction_reload_timer = time.time()
         self.reaction_reload = False
+        self.water_earth_reaction = False
+        self.fire_earth_reaction = False
 
     def cut_sheet(self, sheet, columns, rows):
         self.rect = pygame.Rect(0, 0, sheet.get_width() // columns,
@@ -203,8 +206,16 @@ class Enemy(pygame.sprite.Sprite):
         if len(self.element) > 2:
             for i in range(len(self.element) - 2):
                 self.element.remove(self.element[i + 2])
+        if self.element[0] == self.element[1]:
+            self.HP -= owner.atk / 2
+            self.element.remove(self.element[1])
+        # Вода по огню бьет намного больнее
+        elif self.element[0] == 'fire' and self.element[1] == 'water':
+            # X10 урон
+            self.HP -= self.owner.atk * 10
+            self.element.remove(self.element[1])
 
-        if 'fire' in self.element and 'water' in self.element:
+        elif 'fire' in self.element and 'water' in self.element:
             self.fire_water()
 
         elif 'fire' in self.element and 'earth' in self.element:
@@ -232,33 +243,55 @@ class Enemy(pygame.sprite.Sprite):
             self.kill()
 
     def fire_water(self):
+        # X2 урон
         self.HP -= self.owner.atk * 2
+        self.element.remove(self.element[1])
 
     def fire_earth(self):
-        timer = time.time()
+        # Оглушение врага на 2 сек
+        self.fire_earth_timer = time.time()
+        self.fire_earth_reaction = True
         self.HP -= self.owner.atk
-        while time.time() - timer < 1.5:
-            pass
+        self.move_speed = 0
+        self.element.remove(self.element[1])
 
     def fire_electricity(self):
+        # С шансом 20% враг умирает от "перегрузки"
         self.HP -= self.owner.atk
-        kill = random.randint(1, 10) == 10
+        kill = random.randint(1, 5) == 5
         if kill:
             enemies_group.remove(self)
             self.kill()
+        self.element.remove(self.element[1])
 
     def water_earth(self):
-        self.water_earth_reaction_timer = time.time()
-        self.HP -= self.owner.atk
-        self.move_speed = 0.5
-        self.water_earth_reaction = True
-        if not self.water_earth_reaction:
-            self.water_earth_reaction = False
+        # Небольшое оглушение + переодический урон(0,5) от "яда" 5 раз
+        # *Перезарядка реакций начинается с момента проведения данной реакции и заканчивается в конце реакции
+        print('water + earth')
+        if self.water_earth_reaction and not self.reaction_reload:
+            print('not water_earth reaction')
             self.move_speed = 1
+            self.reaction_reload_timer = time.time()
+            self.water_earth_reaction = False
+            self.cycles = 0
+        elif not self.water_earth_reaction and not self.reaction_reload:
+            self.water_earth_reaction_timer = time.time()
+            self.HP -= self.owner.atk
+            self.reaction_reload = True
+            self.water_earth_reaction = True
+            self.move_speed = 0
+            self.element.remove(self.element[1])
+            print('move_speed:', self.move_speed)
+        else:
+            self.HP -= self.owner.atk
+            self.element.remove(self.element[1])
 
     def water_electricity(self):
+        atk = self.owner.atk
+        if self.element[1] == 'water':
+            atk *= 3
         if self.reaction_reload:
-            self.HP -= self.owner.atk
+            self.HP -= atk
             print('reload')
         else:
             for enemy in enemies_group:
@@ -268,19 +301,20 @@ class Enemy(pygame.sprite.Sprite):
                     print('collide:', self.rect.collidepoint(enemy.rect.x, enemy.rect.y),
                           abs(self.rect.x - enemy.rect.x), 'and', abs(self.rect.y - enemy.rect.y))
                     if self.rect.collidepoint(enemy.rect.x, enemy.rect.y) \
-                            or abs(self.rect.x - enemy.rect.x) < 48 and abs(self.rect.y - enemy.rect.y) < 48:
+                            or abs(self.rect.x - enemy.rect.x) < 65 and abs(self.rect.y - enemy.rect.y) < 65:
                         if enemy == self:
                             print('enemy=self')
-                            self.HP -= self.owner.atk * 1.5
+                            self.HP -= atk * 1.5
                         else:
-                            enemy.HP -= self.owner.atk * 1.5
+                            enemy.HP -= atk * 1.5
                             print('enemy!=self')
             self.reaction_reload = True
             self.reaction_reload_timer = time.time()
             self.element.remove(self.element[1])
 
     def earth_electricity(self):
-        self.HP -= self.HP / 10
+        self.HP -= self.owner.atk + self.HP / 8
+        self.element.remove(self.element[1])
 
 
 class Fire_Enemy(Enemy):
@@ -378,7 +412,7 @@ class Projectile(pygame.sprite.Sprite):
 class Tower(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__(all_sprites)
-        self.columns = 4
+        self.sheet_columns = 4
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
         self.sheet = load_image('error.png')
@@ -460,8 +494,8 @@ class Fire_tower(Tower):
     def __init__(self, x, y):
         self.frames = []
         self.sheet = load_image('fire_tower1.png')
-        self.columns = 11
-        self.cut_sheet(self.sheet, self.columns, 1)
+        self.sheet_columns = 11
+        self.cut_sheet(self.sheet, self.sheet_columns, 1)
         super().__init__(x, y)
         self.atk = 2
         self.element = 'fire'
@@ -473,37 +507,44 @@ class Earth_tower(Tower):
     def __init__(self, x, y):
         self.frames = []
         self.sheet = load_image('earth_tower.png')
-        self.columns = 8
-        self.cut_sheet(self.sheet, self.columns, 1)
+        self.sheet_columns = 8
+        self.cut_sheet(self.sheet, self.sheet_columns, 1)
         super().__init__(x, y)
-        self.atk = 3
+        self.atk = 4
         self.atk_delay = 2
         self.bullet_speed = 35
         self.element = 'earth'
+        self.bullet_image = load_image('earth_bullet.png')
+        self.bullet_columns = 10
 
 
 class Storm_tower(Tower):
     def __init__(self, x, y):
         self.frames = []
         self.sheet = load_image('storm_enemy.png')
-        self.columns = 4
-        self.cut_sheet(self.sheet, self.columns, 1)
+        self.sheet_columns = 4
+        self.cut_sheet(self.sheet, self.sheet_columns, 1)
         super().__init__(x, y)
         self.atk = 1
         self.atk_delay = 0.5
         self.element = 'electricity'
+        self.bullet_image = load_image('electricity_bullet.png')
+        self.bullet_columns = 6
 
 
 class Water_tower(Tower):
     def __init__(self, x, y):
         self.frames = []
         self.sheet = load_image('water_tower1.png')
-        self.columns = 23
-        self.cut_sheet(self.sheet, self.columns, 1)
+        self.sheet_columns = 23
+        self.cut_sheet(self.sheet, self.sheet_columns, 1)
         super().__init__(x, y)
         self.atk = 0.1
         self.atk_delay = 0.33
         self.element = 'water'
+        self.bullet_speed = 15
+        self.bullet_image = load_image('water_bullet.png')
+        self.bullet_columns = 6
 
 
 class Select_menu(pygame.sprite.Sprite):
@@ -561,8 +602,6 @@ generate_level(load_level('level_1.txt'))
 # Spawn Enemies
 # Координаты поворотов должны быть кратны скорости передвижения(5)
 level_1 = [(0, 80), (335, 80), (335, 315), (240, 315), (240, 230), (0, 230)]
-
-rect_group = pygame.sprite.Group()
 
 timer_1 = time.time()
 timer_2 = time.time()
@@ -655,31 +694,37 @@ while running:
     except BaseException:
         pass
     # Создаем врагов
-    # Fire_Enemy(), Storm_Enemy(), Earth_Enemy(),
-    enemy_list = [Water_Enemy()]
-    if time.time() - timer_2 > 1:
+    # Fire_Enemy(), Storm_Enemy(), Earth_Enemy(), Water_Enemy()
+    enemy_list = [Earth_Enemy()]
+    if time.time() - timer_2 > 2:
         timer_2 = time.time()
         enemy = random.choice(enemy_list)
         enemies_group.add(enemy)
 
         for enemy in enemies_group:
-            try:
-                if enemy.reaction_reload:
-                    print(time.time() - enemy.reaction_reload_timer)
-                if time.time() - enemy.reaction_reload_timer > 1:
+            if enemy.water_earth_reaction:
+                print('water_earth_reaction')
+                if time.time() - enemy.water_earth_reaction_timer > 1:
+                    print(time.time() - enemy.water_earth_reaction_timer)
+                    enemy.move_speed = 1
+                    enemy.water_earth_reaction_timer = time.time()
+                    enemy.cycles += 1
+                    enemy.HP -= 0.5
+                    print('cycle:', enemy.cycles)
+                if enemy.cycles == 5:
+                    enemy.reaction_reload_timer = time.time()
                     enemy.reaction_reload = False
-                elif enemy.water_earth_reaction:
-                    if time.time() - enemy.water_earth_reaction_timer > 0.5:
-                        enemy.cycle += 1
-                        enemy.HP -= 0.5
-                        enemy.move_speed = 0.5
-                if enemy.cycle == 3:
-                    enemy.water_earth_reaction = False
-            except BaseException:
-                pass
+                    enemy.water_earth()
+                    print('cycle:', enemy.cycles)
+            elif enemy.fire_earth_reaction:
+                if time.time() - enemy.fire_earth_timer > 2:
+                    enemy.move_speed = 1
+                    enemy.fire_earth_reaction = False
+            elif enemy.reaction_reload:
+                if time.time() - enemy.reaction_reload_timer > 0.1:
+                    enemy.reaction_reload = False
     # display.flip должен быть последней командой
     pygame.display.flip()
 terminate()
-
 
 # поправить реакцию земли и воды
