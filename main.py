@@ -256,12 +256,14 @@ class Enemy(pygame.sprite.Sprite):
         self.element.remove(self.element[1])
 
     def fire_electricity(self):
+        global gold
         # С шансом 20% враг умирает от "перегрузки"
         self.HP -= self.owner.atk
         kill = random.randint(1, 5) == 5
         if kill:
             enemies_group.remove(self)
             self.kill()
+            gold += 5
         self.element.remove(self.element[1])
 
     def water_earth(self):
@@ -596,6 +598,8 @@ generate_level(load_level('level_1.txt'))
 # Координаты поворотов должны быть кратны скорости передвижения(5)
 level_1 = [(0, 80), (335, 80), (335, 315), (240, 315), (240, 230), (0, 230)]
 
+per = False
+timer = 4
 timer_1 = time.time()
 timer_2 = time.time()
 clicks = 0
@@ -687,13 +691,15 @@ while running:
     except BaseException:
         pass
     # Создаем врагов
-    # Fire_Enemy(), Storm_Enemy(), Earth_Enemy(), Water_Enemy()
-    enemy_list = [Earth_Enemy()]
-    if time.time() - timer_2 > 2:
+    enemy_list = [Fire_Enemy(), Storm_Enemy(), Earth_Enemy(), Water_Enemy()]
+    if time.time() - timer_2 > timer:
+        timer -= 0.1
         timer_2 = time.time()
         enemy = random.choice(enemy_list)
         enemies_group.add(enemy)
-
+        if timer <= 3:
+            timer = 1000
+            per = True
         for enemy in enemies_group:
             if enemy.water_earth_reaction:
                 if time.time() - enemy.water_earth_reaction_timer > 1:
@@ -719,6 +725,8 @@ while running:
     screen.blit(text, (10, 440))
     # display.flip должен быть последней командой
     pygame.display.flip()
+    if per:
+        if len(enemies_group) == 0:
+            print('Вы выиграли')
+            running = False
 terminate()
-
-# поправить реакцию земли и воды
