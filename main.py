@@ -192,13 +192,13 @@ class Enemy(pygame.sprite.Sprite):
             enemies_group.remove(self)
             self.kill()
         # HP bar
-        if self.HP / 6 < 0.67:
+        if self.HP / 10 < 0.67:
             self.color = (255, 124, 0)
-        if self.HP / 6 < 0.34:
+        if self.HP / 10 < 0.34:
             self.color = (255, 0, 0)
         if self.HP > 0:
             pygame.draw.rect(screen, self.color, (self.rect.x, self.rect.y - 10,
-                                                  48 - 48 // 6 * (6 - self.HP), 7))
+                                                  48 - 48 // 10 * (10 - self.HP), 7))
             pygame.draw.rect(screen, (0, 0, 0), (self.rect.x - 1, self.rect.y - 10, 49, 8), 1)
 
     def reaction(self, owner):
@@ -313,7 +313,7 @@ class Enemy(pygame.sprite.Sprite):
 class Fire_Enemy(Enemy):
     def __init__(self):
         super().__init__()
-        self.HP = 6
+        self.HP = 10
         self.element.append('fire')
         self.sheet = load_image('fire_enemy.png')
         self.cut_sheet(self.sheet, 4, 1)
@@ -324,7 +324,7 @@ class Fire_Enemy(Enemy):
 class Storm_Enemy(Enemy):
     def __init__(self):
         super().__init__()
-        self.HP = 6
+        self.HP = 10
         self.animation_delay = 0.1
         self.element.append('electricity')
         self.sheet = load_image('storm_enemy.png')
@@ -336,7 +336,7 @@ class Storm_Enemy(Enemy):
 class Earth_Enemy(Enemy):
     def __init__(self):
         super().__init__()
-        self.HP = 6
+        self.HP = 10
         self.animation_delay = 0.12
         self.element.append('earth')
         self.sheet = load_image('earth_enemy.png')
@@ -348,7 +348,7 @@ class Earth_Enemy(Enemy):
 class Water_Enemy(Enemy):
     def __init__(self):
         super().__init__()
-        self.HP = 6
+        self.HP = 10
         self.animation_delay = 0.12
         self.element.append('water')
         self.sheet = load_image('water_enemy.png')
@@ -598,8 +598,11 @@ generate_level(load_level('level_1.txt'))
 # Координаты поворотов должны быть кратны скорости передвижения(5)
 level_1 = [(0, 80), (335, 80), (335, 315), (240, 315), (240, 230), (0, 230)]
 
+game = False
 per = False
-timer = 4
+wave_time_out = 8
+enemy_time_out = 2
+kol_of_enemies = 5
 timer_1 = time.time()
 timer_2 = time.time()
 clicks = 0
@@ -607,9 +610,115 @@ running = True
 # Tower
 tower_place = list()
 tower_error = False
+cycles = 0
+
+
+def spawn_enemies():
+    global kol_of_enemies, cycles, wave_time_out, per, wave_time_out, timer_2, enemy_time_out
+    if kol_of_enemies > 100:
+        wave_time_out = 1000
+        per = True
+        return
+    if cycles != kol_of_enemies:
+        if time.time() - timer_2 > enemy_time_out:
+            timer_2 = time.time()
+            enemy = random.choice(enemy_list)
+            enemies_group.add(enemy)
+            cycles += 1
+    else:
+        cycles = 0
+        wave_time_out = 8
+        kol_of_enemies += 5
+        if enemy_time_out > 0.2:
+            enemy_time_out -= 0.2
+
+
+def win():
+    while True:
+        fon = pygame.transform.scale(load_image('win.png'), (WIDTH, HEIGHT))
+        screen.blit(fon, (0, 0))
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                terminate()
+
+
+def start_screen():
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    fon = pygame.transform.scale(load_image('menu.png'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                if 157 < event.pos[0] < 322 and 165 < event.pos[1] < 191:
+                    level_menu()
+                    return
+                if 157 < event.pos[0] < 322 and 288 < event.pos[1] < 314:
+                    learn()
+                    return
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def level_menu():
+    global game
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    fon = pygame.transform.scale(load_image('level_menu.png'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                if 44 < event.pos[0] < 441 and 31 < event.pos[1] < 85:
+                    game = True
+                    return
+                elif 31 < event.pos[0] < 322 and 288 < event.pos[1] < 314:
+                    pass
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def learn():
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    fon = pygame.transform.scale(load_image('learn.png'), (WIDTH, HEIGHT))
+    screen.blit(fon, (0, 0))
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                start_screen()
+                return
+        pygame.display.flip()
+        clock.tick(FPS)
+
+
+def defeat():
+    while True:
+        fon = pygame.transform.scale(load_image('defeat.png'), (WIDTH, HEIGHT))
+        screen.blit(fon, (0, 0))
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                terminate()
+            elif event.type == pygame.KEYDOWN or \
+                    event.type == pygame.MOUSEBUTTONDOWN:
+                    terminate()
+
+
+if not game:
+    start_screen()
 while running:
     if HP == 0:
-        print('Вы проиграли')
+        defeat()
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -692,37 +801,38 @@ while running:
         pass
     # Создаем врагов
     enemy_list = [Fire_Enemy(), Storm_Enemy(), Earth_Enemy(), Water_Enemy()]
-    if time.time() - timer_2 > timer:
-        timer -= 0.1
-        timer_2 = time.time()
-        enemy = random.choice(enemy_list)
-        enemies_group.add(enemy)
-        if timer <= 3:
-            timer = 1000
-            per = True
-        for enemy in enemies_group:
-            if enemy.water_earth_reaction:
-                if time.time() - enemy.water_earth_reaction_timer > 1:
-                    enemy.move_speed = 1
-                    enemy.water_earth_reaction_timer = time.time()
-                    enemy.cycles += 1
-                    enemy.HP -= 0.5
-                if enemy.cycles == 5:
-                    enemy.reaction_reload_timer = time.time()
-                    enemy.reaction_reload = False
-                    enemy.water_earth()
-            elif enemy.fire_earth_reaction:
-                if time.time() - enemy.fire_earth_timer > 2.5:
-                    enemy.move_speed = 1
-                    enemy.fire_earth_reaction = False
-            elif enemy.reaction_reload:
-                if time.time() - enemy.reaction_reload_timer > 0.1:
-                    enemy.reaction_reload = False
+    # 5 сек подготовки/перерыва между волнами
+    if time.time() - timer_2 > wave_time_out:
+        wave_time_out = 0
+        spawn_enemies()
+    for enemy in enemies_group:
+        if enemy.water_earth_reaction:
+            if time.time() - enemy.water_earth_reaction_timer > 1:
+                enemy.move_speed = 1
+                enemy.water_earth_reaction_timer = time.time()
+                enemy.cycles += 1
+                enemy.HP -= 0.5
+            if enemy.cycles == 5:
+                enemy.reaction_reload_timer = time.time()
+                enemy.reaction_reload = False
+                enemy.water_earth()
+        elif enemy.fire_earth_reaction:
+            if time.time() - enemy.fire_earth_timer > 2.5:
+                enemy.move_speed = 1
+                enemy.fire_earth_reaction = False
+        elif enemy.reaction_reload:
+            if time.time() - enemy.reaction_reload_timer > 0.1:
+                enemy.reaction_reload = False
     # gold
-    f1 = pygame.font.Font(None, 50)
+    gold_text = pygame.font.Font(None, 50)
     t1 = "gold: " + str(gold)
-    text = f1.render(t1, True, (255, 255, 0))
+    text = gold_text.render(t1, True, (255, 255, 0))
     screen.blit(text, (10, 440))
+    # hp
+    hp_text = pygame.font.Font(None, 50)
+    t2 = "HP: " + str(HP)
+    text = hp_text.render(t2, True, (255, 0, 0))
+    screen.blit(text, (365, 440))
     # display.flip должен быть последней командой
     pygame.display.flip()
     if per:
